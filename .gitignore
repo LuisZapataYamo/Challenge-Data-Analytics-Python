@@ -5,3 +5,4 @@ __pycache__
 bibliotecas
 museos
 salas_cine
+*.log
