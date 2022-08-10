@@ -1,43 +1,97 @@
 import logging
-from datetime import date
-import os
-import requests
-import pandas
+from decouple import config
+from create_tables import DataBase
 
-class Categoria:
-    """Esta es una clase que representa una categoria
-        Atributos:
-            tipo (str): Es el nombre de la categoria
-            url (str) : Es la url del archivo csv a descargar
-            file_path (str) : Es la ruta local del archivo .csv descargado
+from ejecucion import normalizacion_datos, Fuente, procesamiento_cines, generacion_tablas_categoria, generacion_tablas_fuentes, generacion_tablas_provincia_categoria
+
+# Inicializamos la configuracion de los logs
+logging.basicConfig(filename="logs.log", level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
+
+# Incializamos las constantes con las variables de entorno
+URL_MUSEOS = config('URL_MUSEOS', cast=str)
+URL_SALAS = config('URL_SALAS', cast=str)
+URL_BIBLIOTECAS = config('URL_BIBLIOTECAS', cast=str)
+
+
+def main():
+    """Funcion principal que incializa los objetos Fuente, llama a la funcion para normalizar la informacion de las fuentes, llama a la funcion
+        para procesar los datos de la fuente salas_cine, y a las generadoras de tablas de registros por fuente, por categoria y por provincia y categoria 
     """
+    # Se asignan las headers a obtener del dataframe
+    columns_museos = ['Cod_Loc',
+                      'IdProvincia',
+                      'IdDepartamento',
+                      'categoria',
+                      'provincia',
+                      'localidad',
+                      'nombre',
+                      'direccion',
+                      'CP',
+                      'telefono',
+                      'Mail',
+                      'Web']
+    columns_bibliotecas = ['Cod_Loc',
+                           'IdProvincia',
+                           'IdDepartamento',
+                           'Categoría',
+                           'Provincia',
+                           'Localidad',
+                           'Nombre',
+                           'Domicilio',
+                           'CP',
+                           'Teléfono',
+                           'Mail',
+                           'Web']
+    columns_salas_cine = ['Cod_Loc',
+                     'IdProvincia',
+                     'IdDepartamento',
+                     'Categoría',
+                     'Provincia',
+                     'Localidad',
+                     'Nombre',
+                     'Dirección',
+                     'CP',
+                     'Teléfono',
+                     'Mail',
+                     'Web']
 
-    def __init__(self, categoria, url) -> None:
-        self.categoria = categoria
-        self.url = url
+    columns_salas_cine_prov = [ 'Provincia',
+                                'Pantallas',
+                                'Butacas',
+                                'espacio_INCAA']
 
-    def descargarArchivo(self):
-        """Esta función realiza la creacion del directorio y el archivo con nombres formateados,
-        también realiza la descarga del archivo .csv en directorio local y
-        asigna la ruta al atributo file_path del objeto 
-        """
-        # Se obtienen la fecha actual
-        dia = date.today().day
-        mes = date.today().month
-        mes_str = date.today().strftime("%B")
-        anio = date.today().year
-        fecha = f"{dia}-{mes}-{anio}"
-        # Se asigna el formato del nombre deldirectorio para la descarga y se crea 
-        path_dir = f"./{self.categoria}/{anio}-{mes_str}"
-        os.makedirs(path_dir, exist_ok=True)
-        # Se asigna el formato del nombre del archivo y se crea el archivo
-        path_file = f"{path_dir}/{self.categoria}-{fecha}.csv"
-        output = open(path_file, "wb")
-        # Se descargar el archivo csv y se escribe el contenido de este al archivo antes creado 
-        response = requests.get(self.url)
-        output.write(response.content)
-        output.close()
-        # Se asigna la ruta del archivo al atributo file_path del objeto
-        self.file_path = path_file
-        logging.info(f"Se creo el directorio y se descargo el archivo localmente de {self.categoria}")
+    # Creacion de las instancias por fuente
+    museos = Fuente("museos", URL_MUSEOS)
+    bibliotecas = Fuente("bibliotecas", URL_BIBLIOTECAS)
+    salas_cine = Fuente("salas_cine", URL_SALAS)
+    
+    # Tupla de instancias de las fuentes
+    list_fuentes = (museos, bibliotecas, salas_cine)
 
+    # Obtencion de los dataframes de las fuentes
+    df_museos = museos.get_dataframe(columns_museos)
+    df_bibliotecas = bibliotecas.get_dataframe(columns_bibliotecas)
+    df_salas_cine = salas_cine.get_dataframe(columns_salas_cine)
+
+    # Tupla de DataFrames de las fuentes
+    list_dfFuentes = (df_museos, df_bibliotecas, df_salas_cine)
+
+    #Actualizando datos de la tabla cines_provincia
+    df_salas_cine_provincia = salas_cine.get_dataframe(columns_salas_cine_prov)
+    procesamiento_cines(df_salas_cine_provincia)
+    
+    df_registros = normalizacion_datos(list_dfFuentes)
+    
+    # Generacion de tablas
+    
+    # Generacion de tabla de registros por categoria
+    generacion_tablas_categoria(df_registros)
+
+    # Generacion de tabla de registros por fuente
+    generacion_tablas_fuentes(list_fuentes)
+
+    # Genracion de tabla de registros totales por provincia y categoria
+    generacion_tablas_provincia_categoria(df_registros)
+    
+if __name__ == "__main__":
+    main()
