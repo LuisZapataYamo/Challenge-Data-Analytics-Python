@@ -45,3 +45,8 @@
     HOST_DB=
     PORT_DB=
     ```
+## Ejecucion
+- Para iniciar el proyecto se ejecuta el comando
+    ```
+    python main.py
+    ```
