@@ -8,7 +8,7 @@
     ```
 - Creamos el entorno virtual
     ```
-    python -m virtualenv venv
+    python -m virtualenv venv -p python3
     ```
 - Activamos el entorno virtual
     - En bash 
